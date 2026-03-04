@@ -3,12 +3,11 @@
 <head>
     <title>Dim Sum Temperature Dashboard</title>
 
-    <!-- Chart.js for webpage graphs -->
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- ExcelJS & FileSaver for downloadable Excel with charts -->
-    <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/file-saver/dist/FileSaver.min.js"></script>
+    <!-- Excel Export -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
     <style>
         body {
@@ -55,7 +54,7 @@
 
 <div class="container">
 
-    <!-- STEAM WINDOW -->
+    <!-- Steam Window -->
     <div class="window">
         <h2>Steam Temperature</h2>
 
@@ -69,7 +68,7 @@
         <canvas id="steamChart"></canvas>
     </div>
 
-    <!-- DIM SUM WINDOW -->
+    <!-- Dim Sum Window -->
     <div class="window">
         <h2>Dim Sum Temperature</h2>
 
@@ -85,21 +84,19 @@
 
 </div>
 
-<button onclick="downloadExcel()">Download Excel With Graphs</button>
+<button onclick="downloadExcel()">Download Excel Comparison</button>
 
 <script>
-// DATA ARRAYS
-let timeLabels = [];
+
 let steamData = [];
 let dimsumData = [];
+let timeLabels = [];
 
-// TIME FORMAT HH:MM:SS
 function getCurrentTime() {
     let now = new Date();
     return now.toLocaleTimeString('en-GB');
 }
 
-// WEBPAGE CHARTS
 let steamChart = new Chart(document.getElementById('steamChart'), {
     type: 'line',
     data: {
@@ -138,9 +135,11 @@ let dimsumChart = new Chart(document.getElementById('dimsumChart'), {
     }
 });
 
-// SIMULATION: Replace this with real ESP32 data later
+// Temporary Simulation (Remove later)
 setInterval(() => {
+
     let time = getCurrentTime();
+
     let steamTemp = (95 + Math.random()*5).toPrecision(2);
     let dimsumTemp = (60 + Math.random()*20).toPrecision(2);
 
@@ -148,7 +147,6 @@ setInterval(() => {
     steamData.push(steamTemp);
     dimsumData.push(dimsumTemp);
 
-    // Add to tables
     let steamRow = document.getElementById("steamTable").insertRow();
     steamRow.insertCell(0).innerHTML = time;
     steamRow.insertCell(1).innerHTML = steamTemp;
@@ -159,33 +157,28 @@ setInterval(() => {
 
     steamChart.update();
     dimsumChart.update();
+
 }, 2000);
 
-// DOWNLOAD EXCEL WITH REAL LINE CHARTS
-async function downloadExcel() {
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('Temperature Data');
+function downloadExcel() {
 
-    // Header
-    sheet.addRow(['Time', 'Steam Temperature', 'Dim Sum Temperature']);
+    let data = [];
 
-    // Data rows
     for (let i = 0; i < timeLabels.length; i++) {
-        sheet.addRow([timeLabels[i], parseFloat(steamData[i]), parseFloat(dimsumData[i])]);
+        data.push({
+            Time: timeLabels[i],
+            Steam_Temperature: steamData[i],
+            DimSum_Temperature: dimsumData[i]
+        });
     }
 
-    // ExcelJS charts are a bit tricky in browser. Currently, ExcelJS only supports chart creation in Node, 
-    // so we can't embed editable charts in browser fully.  
-    // Alternative: let company create chart from table inside Excel (professional solution)
-    // For demo: we include a table that can generate chart automatically in Excel
+    let worksheet = XLSX.utils.json_to_sheet(data);
+    let workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Temperature Data");
 
-    // Save Excel file
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    saveAs(blob, 'DimSum_Temperature_Data.xlsx');
-
-    alert("Excel downloaded! Open file and create a line chart from the table columns.");
+    XLSX.writeFile(workbook, "DimSum_Temperature_Data.xlsx");
 }
+
 </script>
 
 </body>
