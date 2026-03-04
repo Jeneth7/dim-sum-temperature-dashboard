@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dim Sum Temperature Dashboard</title>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Excel Export -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+    <style>
+        body {
+            font-family: Arial;
+            margin: 20px;
+        }
+
+        .container {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .window {
+            width: 48%;
+            border: 1px solid black;
+            padding: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            border: 1px solid black;
+            padding: 5px;
+            text-align: center;
+        }
+
+        canvas {
+            margin-top: 10px;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+<h1>Automated Dim Sum Temperature Monitoring</h1>
+
+<div class="container">
+
+    <!-- Steam Window -->
+    <div class="window">
+        <h2>Steam Temperature</h2>
+
+        <table id="steamTable">
+            <tr>
+                <th>Time</th>
+                <th>Temperature (°C)</th>
+            </tr>
+        </table>
+
+        <canvas id="steamChart"></canvas>
+    </div>
+
+    <!-- Dim Sum Window -->
+    <div class="window">
+        <h2>Dim Sum Temperature</h2>
+
+        <table id="dimsumTable">
+            <tr>
+                <th>Time</th>
+                <th>Temperature (°C)</th>
+            </tr>
+        </table>
+
+        <canvas id="dimsumChart"></canvas>
+    </div>
+
+</div>
+
+<button onclick="downloadExcel()">Download Excel Comparison</button>
+
+<script>
+
+let steamData = [];
+let dimsumData = [];
+let timeLabels = [];
+
+function getCurrentTime() {
+    let now = new Date();
+    return now.toLocaleTimeString('en-GB');
+}
+
+let steamChart = new Chart(document.getElementById('steamChart'), {
+    type: 'line',
+    data: {
+        labels: timeLabels,
+        datasets: [{
+            label: 'Steam Temperature (°C)',
+            data: steamData,
+            borderColor: 'red',
+            fill: false
+        }]
+    },
+    options: {
+        scales: {
+            x: { title: { display: true, text: 'Time' }},
+            y: { title: { display: true, text: 'Temperature (°C)' }}
+        }
+    }
+});
+
+let dimsumChart = new Chart(document.getElementById('dimsumChart'), {
+    type: 'line',
+    data: {
+        labels: timeLabels,
+        datasets: [{
+            label: 'Dim Sum Temperature (°C)',
+            data: dimsumData,
+            borderColor: 'blue',
+            fill: false
+        }]
+    },
+    options: {
+        scales: {
+            x: { title: { display: true, text: 'Time' }},
+            y: { title: { display: true, text: 'Temperature (°C)' }}
+        }
+    }
+});
+
+// Temporary Simulation (Remove later)
+setInterval(() => {
+
+    let time = getCurrentTime();
+
+    let steamTemp = (95 + Math.random()*5).toPrecision(2);
+    let dimsumTemp = (60 + Math.random()*20).toPrecision(2);
+
+    timeLabels.push(time);
+    steamData.push(steamTemp);
+    dimsumData.push(dimsumTemp);
+
+    let steamRow = document.getElementById("steamTable").insertRow();
+    steamRow.insertCell(0).innerHTML = time;
+    steamRow.insertCell(1).innerHTML = steamTemp;
+
+    let dimsumRow = document.getElementById("dimsumTable").insertRow();
+    dimsumRow.insertCell(0).innerHTML = time;
+    dimsumRow.insertCell(1).innerHTML = dimsumTemp;
+
+    steamChart.update();
+    dimsumChart.update();
+
+}, 2000);
+
+function downloadExcel() {
+
+    let data = [];
+
+    for (let i = 0; i < timeLabels.length; i++) {
+        data.push({
+            Time: timeLabels[i],
+            Steam_Temperature: steamData[i],
+            DimSum_Temperature: dimsumData[i]
+        });
+    }
+
+    let worksheet = XLSX.utils.json_to_sheet(data);
+    let workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Temperature Data");
+
+    XLSX.writeFile(workbook, "DimSum_Temperature_Data.xlsx");
+}
+
+</script>
+
+</body>
+</html>
