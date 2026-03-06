@@ -6,45 +6,20 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+    <!-- MQTT Websocket -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
     <!-- Excel Export -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
     <style>
-        body {
-            font-family: Arial;
-            margin: 20px;
-        }
-
-        .container {
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .window {
-            width: 48%;
-            border: 1px solid black;
-            padding: 10px;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th, td {
-            border: 1px solid black;
-            padding: 5px;
-            text-align: center;
-        }
-
-        canvas {
-            margin-top: 10px;
-        }
-
-        button {
-            margin-top: 20px;
-            padding: 10px;
-        }
+        body { font-family: Arial; margin: 20px; }
+        .container { display: flex; justify-content: space-between; }
+        .window { width: 48%; border: 1px solid black; padding: 10px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid black; padding: 5px; text-align: center; }
+        canvas { margin-top: 10px; }
+        button { margin-top: 20px; padding: 10px; }
     </style>
 </head>
 
@@ -57,28 +32,24 @@
     <!-- Steam Window -->
     <div class="window">
         <h2>Steam Temperature</h2>
-
         <table id="steamTable">
             <tr>
                 <th>Time</th>
                 <th>Temperature (°C)</th>
             </tr>
         </table>
-
         <canvas id="steamChart"></canvas>
     </div>
 
     <!-- Dim Sum Window -->
     <div class="window">
         <h2>Dim Sum Temperature</h2>
-
         <table id="dimsumTable">
             <tr>
                 <th>Time</th>
                 <th>Temperature (°C)</th>
             </tr>
         </table>
-
         <canvas id="dimsumChart"></canvas>
     </div>
 
@@ -97,6 +68,7 @@ function getCurrentTime() {
     return now.toLocaleTimeString('en-GB');
 }
 
+// Initialize Charts
 let steamChart = new Chart(document.getElementById('steamChart'), {
     type: 'line',
     data: {
@@ -105,7 +77,8 @@ let steamChart = new Chart(document.getElementById('steamChart'), {
             label: 'Steam Temperature (°C)',
             data: steamData,
             borderColor: 'red',
-            fill: false
+            fill: false,
+            tension: 0.1
         }]
     },
     options: {
@@ -124,7 +97,8 @@ let dimsumChart = new Chart(document.getElementById('dimsumChart'), {
             label: 'Dim Sum Temperature (°C)',
             data: dimsumData,
             borderColor: 'blue',
-            fill: false
+            fill: false,
+            tension: 0.1
         }]
     },
     options: {
@@ -135,35 +109,51 @@ let dimsumChart = new Chart(document.getElementById('dimsumChart'), {
     }
 });
 
-// Temporary Simulation (Remove later)
-setInterval(() => {
+// --- MQTT Setup ---
+const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
 
-    let time = getCurrentTime();
+client.on('connect', () => {
+    console.log("Connected to MQTT Broker");
+    client.subscribe("dimsumfactory/steamcabinet/temperature");
+});
 
-    let steamTemp = (95 + Math.random()*5).toPrecision(2);
-    let dimsumTemp = (60 + Math.random()*20).toPrecision(2);
+client.on('message', (topic, message) => {
+    try {
+        // Parse JSON payload from ESP32
+        let data = JSON.parse(message.toString());
 
-    timeLabels.push(time);
-    steamData.push(steamTemp);
-    dimsumData.push(dimsumTemp);
+        let time = getCurrentTime();
+        // Display 3 significant figures (e.g., 100.0)
+        let steamTemp = parseFloat(data.steam_temp).toFixed(1);
+        let dimsumTemp = parseFloat(data.dimsum_temp).toFixed(1);
 
-    let steamRow = document.getElementById("steamTable").insertRow();
-    steamRow.insertCell(0).innerHTML = time;
-    steamRow.insertCell(1).innerHTML = steamTemp;
+        // Store for table and graph
+        timeLabels.push(time);
+        steamData.push(steamTemp);
+        dimsumData.push(dimsumTemp);
 
-    let dimsumRow = document.getElementById("dimsumTable").insertRow();
-    dimsumRow.insertCell(0).innerHTML = time;
-    dimsumRow.insertCell(1).innerHTML = dimsumTemp;
+        // Add row to Steam table
+        let steamRow = document.getElementById("steamTable").insertRow();
+        steamRow.insertCell(0).innerHTML = time;
+        steamRow.insertCell(1).innerHTML = steamTemp;
 
-    steamChart.update();
-    dimsumChart.update();
+        // Add row to Dim Sum table
+        let dimsumRow = document.getElementById("dimsumTable").insertRow();
+        dimsumRow.insertCell(0).innerHTML = time;
+        dimsumRow.insertCell(1).innerHTML = dimsumTemp;
 
-}, 2000);
+        // Update Charts
+        steamChart.update();
+        dimsumChart.update();
 
+    } catch (e) {
+        console.error("Invalid message format:", e);
+    }
+});
+
+// --- Excel Download ---
 function downloadExcel() {
-
     let data = [];
-
     for (let i = 0; i < timeLabels.length; i++) {
         data.push({
             Time: timeLabels[i],
@@ -171,11 +161,9 @@ function downloadExcel() {
             DimSum_Temperature: dimsumData[i]
         });
     }
-
     let worksheet = XLSX.utils.json_to_sheet(data);
     let workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Temperature Data");
-
     XLSX.writeFile(workbook, "DimSum_Temperature_Data.xlsx");
 }
 
