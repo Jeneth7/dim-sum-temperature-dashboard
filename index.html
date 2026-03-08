@@ -14,6 +14,23 @@
 
     <style>
         body { font-family: Arial; margin: 20px; }
+
+        /* Login Screen */
+        #loginBox {
+            text-align: center;
+            margin-top: 100px;
+        }
+        #loginBox input {
+            padding: 5px;
+            width: 200px;
+            margin-bottom: 10px;
+        }
+        #loginBox button {
+            padding: 5px 20px;
+        }
+
+        /* Dashboard */
+        #dashboard { display: none; }
         .container { display: flex; justify-content: space-between; }
         .window { width: 48%; border: 1px solid black; padding: 10px; }
         table { width: 100%; border-collapse: collapse; }
@@ -21,14 +38,6 @@
         canvas { margin-top: 10px; }
         button { margin-top: 20px; padding: 10px; }
         #batchControls { margin-top: 20px; }
-
-        /* Login styling */
-        #loginBox {
-            text-align:center;
-            margin-top:100px;
-        }
-        #loginBox input { padding: 5px; width:200px; margin-bottom:10px; }
-        #loginBox button { padding: 5px 20px; }
     </style>
 </head>
 
@@ -44,7 +53,7 @@
 </div>
 
 <!-- Dashboard (hidden until login) -->
-<div id="dashboard" style="display:none;">
+<div id="dashboard">
 
 <h1>Automated Dim Sum Temperature Monitoring</h1>
 
@@ -86,18 +95,12 @@
 </div>
 
 <script>
-let steamData = [];
-let dimsumData = [];
-let timeLabels = [];
-let currentBatchID = '';
-let batchActive = false;
-
-// ---------------------- LOGIN FUNCTION ----------------------
+/* --------------------- LOGIN --------------------- */
 function login() {
     let user = document.getElementById("username").value;
     let pass = document.getElementById("password").value;
 
-    if(user === "smh" && pass === "dimsum987") {
+    if(user === "smh" && pass === "dimsum123") {
         document.getElementById("loginBox").style.display = "none";
         document.getElementById("dashboard").style.display = "block";
     } else {
@@ -105,26 +108,61 @@ function login() {
     }
 }
 
-// ---------------------- TIME FUNCTION ----------------------
+/* --------------------- VARIABLES --------------------- */
+let steamData = [];
+let dimsumData = [];
+let timeLabels = [];
+let currentBatchID = '';
+let batchActive = false;
+
+/* --------------------- TIME --------------------- */
 function getCurrentTime() {
     let now = new Date();
     return now.toLocaleTimeString('en-GB');
 }
 
-// ---------------------- CHARTS ----------------------
+/* --------------------- CHARTS --------------------- */
 let steamChart = new Chart(document.getElementById('steamChart'), {
     type: 'line',
-    data: { labels: timeLabels, datasets:[{label:'Steam Temperature (°C)', data:steamData, borderColor:'red', fill:false, tension:0.1}] },
-    options: { scales:{ x:{title:{display:true,text:'Time'}}, y:{title:{display:true,text:'Temperature (°C)'}} } }
+    data: {
+        labels: timeLabels,
+        datasets: [{
+            label: 'Steam Temperature (°C)',
+            data: steamData,
+            borderColor: 'red',
+            fill: false,
+            tension: 0.1
+        }]
+    },
+    options: {
+        scales: {
+            x: { title: { display: true, text: 'Time' }},
+            y: { title: { display: true, text: 'Temperature (°C)' }}
+        }
+    }
 });
 
 let dimsumChart = new Chart(document.getElementById('dimsumChart'), {
     type: 'line',
-    data: { labels: timeLabels, datasets:[{label:'Dim Sum Temperature (°C)', data:dimsumData, borderColor:'blue', fill:false, tension:0.1}] },
-    options: { scales:{ x:{title:{display:true,text:'Time'}}, y:{title:{display:true,text:'Temperature (°C)'}} } }
+    data: {
+        labels: timeLabels,
+        datasets: [{
+            label: 'Dim Sum Temperature (°C)',
+            data: dimsumData,
+            borderColor: 'blue',
+            fill: false,
+            tension: 0.1
+        }]
+    },
+    options: {
+        scales: {
+            x: { title: { display: true, text: 'Time' }},
+            y: { title: { display: true, text: 'Temperature (°C)' }}
+        }
+    }
 });
 
-// ---------------------- MQTT SETUP ----------------------
+/* --------------------- MQTT --------------------- */
 const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
 
 client.on('connect', () => {
@@ -159,7 +197,7 @@ client.on('message', (topic, message) => {
     } catch(e) { console.error("Invalid message:", e); }
 });
 
-// ---------------------- BATCH CONTROLS ----------------------
+/* --------------------- BATCH CONTROLS --------------------- */
 function startBatch() {
     currentBatchID = document.getElementById('batchID').value.trim();
     if (!currentBatchID) { alert("Please enter a Batch ID."); return; }
