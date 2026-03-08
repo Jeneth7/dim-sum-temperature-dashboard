@@ -21,10 +21,30 @@
         canvas { margin-top: 10px; }
         button { margin-top: 20px; padding: 10px; }
         #batchControls { margin-top: 20px; }
+
+        /* Login styling */
+        #loginBox {
+            text-align:center;
+            margin-top:100px;
+        }
+        #loginBox input { padding: 5px; width:200px; margin-bottom:10px; }
+        #loginBox button { padding: 5px 20px; }
     </style>
 </head>
 
 <body>
+
+<!-- Login Screen -->
+<div id="loginBox">
+    <h2>Temperature Dashboard Login</h2>
+    <input type="text" id="username" placeholder="Username"><br>
+    <input type="password" id="password" placeholder="Password"><br>
+    <button onclick="login()">Login</button>
+    <p id="error" style="color:red;"></p>
+</div>
+
+<!-- Dashboard (hidden until login) -->
+<div id="dashboard" style="display:none;">
 
 <h1>Automated Dim Sum Temperature Monitoring</h1>
 
@@ -63,6 +83,8 @@
     <button onclick="downloadExcel()">Download Excel</button>
 </div>
 
+</div>
+
 <script>
 let steamData = [];
 let dimsumData = [];
@@ -70,12 +92,26 @@ let timeLabels = [];
 let currentBatchID = '';
 let batchActive = false;
 
+// ---------------------- LOGIN FUNCTION ----------------------
+function login() {
+    let user = document.getElementById("username").value;
+    let pass = document.getElementById("password").value;
+
+    if(user === "smh" && pass === "dimsum987") {
+        document.getElementById("loginBox").style.display = "none";
+        document.getElementById("dashboard").style.display = "block";
+    } else {
+        document.getElementById("error").innerText = "Incorrect username or password";
+    }
+}
+
+// ---------------------- TIME FUNCTION ----------------------
 function getCurrentTime() {
     let now = new Date();
     return now.toLocaleTimeString('en-GB');
 }
 
-// Initialize Charts
+// ---------------------- CHARTS ----------------------
 let steamChart = new Chart(document.getElementById('steamChart'), {
     type: 'line',
     data: { labels: timeLabels, datasets:[{label:'Steam Temperature (°C)', data:steamData, borderColor:'red', fill:false, tension:0.1}] },
@@ -88,8 +124,9 @@ let dimsumChart = new Chart(document.getElementById('dimsumChart'), {
     options: { scales:{ x:{title:{display:true,text:'Time'}}, y:{title:{display:true,text:'Temperature (°C)'}} } }
 });
 
-// MQTT Setup
+// ---------------------- MQTT SETUP ----------------------
 const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
+
 client.on('connect', () => {
     console.log("Connected to MQTT Broker");
     client.subscribe("dimsumfactory/steamcabinet/temperature");
@@ -100,8 +137,8 @@ client.on('message', (topic, message) => {
     try {
         let data = JSON.parse(message.toString());
         let time = getCurrentTime();
-        let steamTemp = parseFloat(data.steam_temp).toFixed(1);
-        let dimsumTemp = parseFloat(data.dimsum_temp).toFixed(1);
+        let steamTemp = parseFloat(data.steam_temp).toFixed(3);
+        let dimsumTemp = parseFloat(data.dimsum_temp).toFixed(3);
 
         timeLabels.push(time);
         steamData.push(steamTemp);
@@ -122,7 +159,7 @@ client.on('message', (topic, message) => {
     } catch(e) { console.error("Invalid message:", e); }
 });
 
-// Batch Controls
+// ---------------------- BATCH CONTROLS ----------------------
 function startBatch() {
     currentBatchID = document.getElementById('batchID').value.trim();
     if (!currentBatchID) { alert("Please enter a Batch ID."); return; }
