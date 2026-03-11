@@ -89,7 +89,7 @@
     <label>Batch ID: <input type="text" id="batchID" placeholder="e.g., DS240326-01"></label>
     <button onclick="startBatch()">Start Batch</button>
     <button onclick="stopBatch()">Stop Batch</button>
-    <button onclick="downloadExcel()">Download Excel</button>
+    <button onclick="downloadExcelTemplate()">Download Excel</button>
 </div>
 
 </div>
@@ -118,7 +118,7 @@ let batchActive = false;
 /* --------------------- TIME --------------------- */
 function getCurrentTime() {
     let now = new Date();
-    return now.toLocaleTimeString('en-GB');
+    return now.toLocaleTimeString('en-GB'); // Format: HH:MM:SS
 }
 
 /* --------------------- CHARTS --------------------- */
@@ -136,8 +136,8 @@ let steamChart = new Chart(document.getElementById('steamChart'), {
     },
     options: {
         scales: {
-            x: { title: { display: true, text: 'Time' }},
-            y: { title: { display: true, text: 'Temperature (°C)' }}
+            x: { title: { display: true, text: 'Time' }, ticks: { maxRotation: 90, minRotation: 90 } },
+            y: { title: { display: true, text: 'Temperature (°C)' } }
         }
     }
 });
@@ -156,8 +156,8 @@ let dimsumChart = new Chart(document.getElementById('dimsumChart'), {
     },
     options: {
         scales: {
-            x: { title: { display: true, text: 'Time' }},
-            y: { title: { display: true, text: 'Temperature (°C)' }}
+            x: { title: { display: true, text: 'Time' }, ticks: { maxRotation: 90, minRotation: 90 } },
+            y: { title: { display: true, text: 'Temperature (°C)' } }
         }
     }
 });
@@ -220,21 +220,38 @@ function stopBatch() {
     alert(`Batch ${currentBatchID} stopped! You can now download the Excel file.`);
 }
 
-function downloadExcel() {
+/* --------------------- EXCEL TEMPLATE EXPORT --------------------- */
+function downloadExcelTemplate() {
     if (!currentBatchID) { alert("Please start a batch first."); return; }
-    let data = [];
-    for (let i = 0; i < timeLabels.length; i++) {
-        data.push({
-            Batch: currentBatchID,
-            Time: timeLabels[i],
-            Steam_Temperature: steamData[i],
-            DimSum_Temperature: dimsumData[i]
-        });
-    }
-    let worksheet = XLSX.utils.json_to_sheet(data);
-    let workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Temperature Data");
-    XLSX.writeFile(workbook, `DimSum_${currentBatchID}_Temperature.xlsx`);
+
+    fetch('DimSumTemplate.xlsx')
+        .then(res => res.arrayBuffer())
+        .then(data => {
+            let workbook = XLSX.read(data, {type: "array"});
+            let sheetName = workbook.SheetNames[0];
+            let worksheet = workbook.Sheets[sheetName];
+
+            // Clear existing rows except headers
+            XLSX.utils.sheet_add_json(worksheet, [], {origin:1, skipHeader:true});
+
+            // Add new data
+            let newData = [];
+            for (let i = 0; i < timeLabels.length; i++) {
+                newData.push({
+                    Time: timeLabels[i],
+                    Steam_Temperature: steamData[i],
+                    DimSum_Temperature: dimsumData[i]
+                });
+            }
+
+            XLSX.utils.sheet_add_json(worksheet, newData, {origin:1, skipHeader:true});
+
+            // Rename sheet to Batch ID
+            XLSX.utils.book_append_sheet(workbook, worksheet, currentBatchID);
+
+            XLSX.writeFile(workbook, `DimSum_${currentBatchID}_Temperature.xlsx`);
+        })
+        .catch(err => console.error("Error loading template:", err));
 }
 </script>
 
