@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
 <meta charset="UTF-8">
 <title>Dim Sum Temperature Dashboard</title>
@@ -12,82 +13,56 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <style>
-
-body{
-font-family:Arial;
-margin:30px;
-background:#f5f5f5;
+body {
+    font-family: Arial;
+    background: #f4f4f4;
+    margin: 30px;
 }
 
-h1{
-text-align:center;
+h1 {
+    text-align: center;
 }
 
-#controls{
-margin-bottom:20px;
-text-align:center;
+button {
+    padding: 8px 14px;
+    margin: 5px;
+    cursor: pointer;
 }
 
-button{
-padding:8px 14px;
-margin-left:5px;
-cursor:pointer;
+#controls {
+    text-align: center;
+    margin-bottom: 20px;
 }
 
-input{
-padding:6px;
+.dashboard {
+    display: flex;
+    gap: 30px;
 }
 
-.dashboard{
-display:flex;
-gap:30px;
-align-items:flex-start;
+.panel {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    width: 50%;
 }
 
-/* TABLE PANEL */
-
-.tablePanel{
-background:white;
-padding:15px;
-border-radius:8px;
-box-shadow:0 2px 6px rgba(0,0,0,0.15);
-width:50%;
-max-height:500px;
-overflow-y:auto;
+table {
+    border-collapse: collapse;
+    width: 100%;
 }
 
-table{
-border-collapse:collapse;
-width:100%;
+th {
+    background: #0077b6;
+    color: white;
+    padding: 8px;
 }
 
-th{
-background:#0077b6;
-color:white;
-padding:8px;
+td {
+    border: 1px solid #ccc;
+    padding: 6px;
+    text-align: center;
 }
-
-td{
-border:1px solid #ccc;
-padding:6px;
-text-align:center;
-}
-
-/* GRAPH PANEL */
-
-.chartPanel{
-background:white;
-padding:15px;
-border-radius:8px;
-box-shadow:0 2px 6px rgba(0,0,0,0.15);
-width:50%;
-}
-
-canvas{
-width:100%;
-height:400px;
-}
-
 </style>
 </head>
 
@@ -95,258 +70,227 @@ height:400px;
 
 <h1>Dim Sum Temperature Monitoring</h1>
 
+<div style="text-align:center">
+    <button onclick="showLive()">Live Monitoring</button>
+    <button onclick="showHistory()">Batch History</button>
+</div>
+
 <div id="controls">
-
-Batch ID:
-<input id="batchID">
-
-<button onclick="startBatch()">Start Batch</button>
-<button onclick="stopBatch()">Stop Batch</button>
-<button onclick="downloadExcel()">Download Excel</button>
-
+    Batch ID: <input id="batchID">
+    <button onclick="startBatch()">Start Batch</button>
+    <button onclick="stopBatch()">Stop Batch</button>
+    <button onclick="downloadExcel()">Download Excel</button>
 </div>
 
+<div id="livePage" class="dashboard">
+    <div class="panel">
+        <table id="tempTable">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Steam Temperature (°C)</th>
+                    <th>Dim Sum Temperature (°C)</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
 
-<div class="dashboard">
-
-<div class="tablePanel">
-
-<table id="tempTable">
-
-<thead>
-<tr>
-<th>Time</th>
-<th>Steam Temperature (°C)</th>
-<th>Dim Sum Temperature (°C)</th>
-</tr>
-</thead>
-
-<tbody></tbody>
-
-</table>
-
+    <div class="panel">
+        <canvas id="tempChart"></canvas>
+    </div>
 </div>
 
+<div id="historyPage" style="display:none">
+    <h2>Batch History</h2>
+    <select id="batchDropdown"></select>
+    <button onclick="loadBatch()">Load Batch</button>
+    <button onclick="downloadHistoryExcel()">Download Excel</button>
 
-<div class="chartPanel">
+    <br><br>
 
-<canvas id="tempChart"></canvas>
-
+    <div class="dashboard">
+        <div class="panel">
+            <table id="historyTable">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Steam Temperature</th>
+                        <th>Dim Sum Temperature</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div class="panel">
+            <canvas id="historyChart"></canvas>
+        </div>
+    </div>
 </div>
-
-</div>
-
 
 <script>
-
 /* FIREBASE CONFIG */
-
 const firebaseConfig = {
-
-apiKey:"AIzaSyBJYBNVCNXHlaCl5wakhohU6aED5ZZXzhk",
-authDomain:"dim-sum-temperature-monitoring.firebaseapp.com",
-projectId:"dim-sum-temperature-monitoring",
-storageBucket:"dim-sum-temperature-monitoring.firebasestorage.app",
-messagingSenderId:"1:1014513307897:web:dbf077e9f085b8823d1228",
-appId:"G-1JV1ZW47KX"
-
+    apiKey: "PASTE_YOUR_KEY",
+    authDomain: "PASTE",
+    projectId: "PASTE",
+    storageBucket: "PASTE",
+    messagingSenderId: "PASTE",
+    appId: "PASTE"
 };
-
 firebase.initializeApp(firebaseConfig);
-const db=firebase.firestore();
+const db = firebase.firestore();
 
-
-let batchActive=false;
-let currentBatchID="";
+/* VARIABLES */
+let batchActive = false;
+let currentBatchID = "";
 let startTime;
+let times = [];
+let steamTemps = [];
+let dimsumTemps = [];
 
-let times=[];
-let steamTemps=[];
-let dimsumTemps=[];
-
-
-/* CHART */
-
-const ctx=document.getElementById("tempChart");
-
-const chart=new Chart(ctx,{
-
-type:"line",
-
-data:{
-labels:times,
-datasets:[
-
-{
-label:"Steam Temperature",
-data:steamTemps,
-borderWidth:2
-},
-
-{
-label:"Dim Sum Temperature",
-data:dimsumTemps,
-borderWidth:2
-}
-
-]
-},
-
-options:{
-responsive:true,
-scales:{
-x:{
-ticks:{
-maxRotation:90,
-minRotation:90
-}
-},
-y:{
-title:{
-display:true,
-text:"Temperature °C"
-}
-}
-}
-}
-
+/* LIVE CHART */
+const ctx = document.getElementById("tempChart").getContext("2d");
+const chart = new Chart(ctx, {
+    type: "line",
+    data: {
+        labels: times,
+        datasets: [
+            { label: "Steam Temperature", data: steamTemps, borderWidth: 2 },
+            { label: "Dim Sum Temperature", data: dimsumTemps, borderWidth: 2 }
+        ]
+    },
+    options: { scales: { x: { ticks: { maxRotation: 90, minRotation: 90 } }, y: { title: { display: true, text: "Temperature °C" } } } }
 });
 
+/* HISTORY CHART */
+const historyCtx = document.getElementById("historyChart").getContext("2d");
+const historyChart = new Chart(historyCtx, {
+    type: "line",
+    data: {
+        labels: [],
+        datasets: [
+            { label: "Steam Temperature", data: [], borderWidth: 2 },
+            { label: "Dim Sum Temperature", data: [], borderWidth: 2 }
+        ]
+    }
+});
 
 /* MQTT */
-
-const client=mqtt.connect("wss://broker.hivemq.com:8884/mqtt");
-
-client.on("connect",function(){
-
-console.log("MQTT connected");
-
-client.subscribe("dimsum/temperature");
-
+const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt");
+client.on("connect", function () {
+    console.log("MQTT connected");
+    client.subscribe("dimsum/temperature");
 });
 
+client.on("message", function (topic, message) {
+    if (!batchActive) return;
+    const data = JSON.parse(message.toString());
+    const steam = parseFloat(data.steam).toFixed(3);
+    const dimsum = parseFloat(data.dimsum).toFixed(3);
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const h = String(Math.floor(elapsed / 3600)).padStart(2, "0");
+    const m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, "0");
+    const s = String(elapsed % 60).padStart(2, "0");
+    const time = `${h}:${m}:${s}`;
 
-client.on("message",function(topic,message){
+    times.push(time);
+    steamTemps.push(steam);
+    dimsumTemps.push(dimsum);
+    chart.update();
 
-if(!batchActive)return;
+    /* Update table */
+    const row = document.createElement("tr");
+    row.innerHTML = "<td>" + time + "</td><td>" + steam + "</td><td>" + dimsum + "</td>";
+    document.querySelector("#tempTable tbody").appendChild(row);
 
-const data=JSON.parse(message.toString());
-
-const steam=parseFloat(data.steam).toFixed(3);
-const dimsum=parseFloat(data.dimsum).toFixed(3);
-
-const elapsed=Math.floor((Date.now()-startTime)/1000);
-
-const h=String(Math.floor(elapsed/3600)).padStart(2,"0");
-const m=String(Math.floor((elapsed%3600)/60)).padStart(2,"0");
-const s=String(elapsed%60).padStart(2,"0");
-
-const time=`${h}:${m}:${s}`;
-
-times.push(time);
-steamTemps.push(steam);
-dimsumTemps.push(dimsum);
-
-chart.update();
-
-
-const row=document.createElement("tr");
-
-row.innerHTML=`<td>${time}</td><td>${steam}</td><td>${dimsum}</td>`;
-
-document.querySelector("#tempTable tbody").appendChild(row);
-
-
-/* SAVE TO FIREBASE */
-
-db.collection("batches")
-.doc(currentBatchID)
-.collection("readings")
-.add({
-
-time:time,
-steam:parseFloat(steam),
-dimsum:parseFloat(dimsum),
-timestamp:new Date()
-
+    /* Save to Firebase */
+    db.collection("batches").doc(currentBatchID).collection("readings").add({
+        time: time,
+        steam: parseFloat(steam),
+        dimsum: parseFloat(dimsum),
+        timestamp: new Date()
+    });
 });
 
-});
-
-
-async function startBatch(){
-
-const batchID=document.getElementById("batchID").value.trim();
-
-if(!batchID){
-
-alert("Enter Batch ID");
-return;
-
+/* START BATCH */
+async function startBatch() {
+    const batchID = document.getElementById("batchID").value.trim();
+    if (!batchID) { alert("Enter Batch ID"); return; }
+    const doc = await db.collection("batches").doc(batchID).get();
+    if (doc.exists) { alert("Batch ID already exists"); return; }
+    await db.collection("batches").doc(batchID).set({ createdAt: new Date() });
+    currentBatchID = batchID;
+    batchActive = true;
+    startTime = Date.now();
+    times = [];
+    steamTemps = [];
+    dimsumTemps = [];
+    chart.data.labels = times;
+    chart.data.datasets[0].data = steamTemps;
+    chart.data.datasets[1].data = dimsumTemps;
+    chart.update();
+    document.querySelector("#tempTable tbody").innerHTML = "";
 }
 
-const doc=await db.collection("batches").doc(batchID).get();
+/* STOP BATCH */
+function stopBatch() { batchActive = false; alert("Batch Saved"); }
 
-if(doc.exists){
-
-alert("Batch ID already exists");
-return;
-
+/* DOWNLOAD LIVE EXCEL */
+function downloadExcel() {
+    let data = [["Time", "Steam Temp", "Dim Sum Temp"]];
+    for (let i = 0; i < times.length; i++) { data.push([times[i], steamTemps[i], dimsumTemps[i]]); }
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Batch");
+    XLSX.writeFile(wb, currentBatchID + ".xlsx");
 }
 
-currentBatchID=batchID;
+/* PAGE SWITCH */
+function showLive() { document.getElementById("livePage").style.display = "flex"; document.getElementById("historyPage").style.display = "none"; }
+function showHistory() { document.getElementById("livePage").style.display = "none"; document.getElementById("historyPage").style.display = "block"; loadBatchList(); }
 
-batchActive=true;
-
-startTime=Date.now();
-
-times=[];
-steamTemps=[];
-dimsumTemps=[];
-
-chart.data.labels=times;
-chart.data.datasets[0].data=steamTemps;
-chart.data.datasets[1].data=dimsumTemps;
-
-chart.update();
-
-document.querySelector("#tempTable tbody").innerHTML="";
-
+/* LOAD BATCH LIST */
+async function loadBatchList() {
+    const snapshot = await db.collection("batches").get();
+    const dropdown = document.getElementById("batchDropdown");
+    dropdown.innerHTML = "";
+    snapshot.forEach(doc => { let option = document.createElement("option"); option.value = doc.id; option.text = doc.id; dropdown.appendChild(option); });
 }
 
-
-function stopBatch(){
-
-batchActive=false;
-
-alert("Batch saved");
-
+/* LOAD HISTORY BATCH */
+async function loadBatch() {
+    const batchID = document.getElementById("batchDropdown").value;
+    const snapshot = await db.collection("batches").doc(batchID).collection("readings").orderBy("timestamp").get();
+    const table = document.querySelector("#historyTable tbody");
+    table.innerHTML = "";
+    let times = [], steam = [], dimsum = [];
+    snapshot.forEach(doc => {
+        const d = doc.data();
+        times.push(d.time);
+        steam.push(d.steam);
+        dimsum.push(d.dimsum);
+        const row = document.createElement("tr");
+        row.innerHTML = "<td>" + d.time + "</td><td>" + d.steam + "</td><td>" + d.dimsum + "</td>";
+        table.appendChild(row);
+    });
+    historyChart.data.labels = times;
+    historyChart.data.datasets[0].data = steam;
+    historyChart.data.datasets[1].data = dimsum;
+    historyChart.update();
 }
 
-
-/* EXCEL DOWNLOAD */
-
-function downloadExcel(){
-
-let data=[["Time","Steam Temperature","Dim Sum Temperature"]];
-
-for(let i=0;i<times.length;i++){
-
-data.push([times[i],steamTemps[i],dimsumTemps[i]]);
-
-}
-
-const ws=XLSX.utils.aoa_to_sheet(data);
-
-const wb=XLSX.utils.book_new();
-
-XLSX.utils.book_append_sheet(wb,ws,currentBatchID);
-
-XLSX.writeFile(wb,currentBatchID+".xlsx");
-
+/* DOWNLOAD HISTORY */
+function downloadHistoryExcel() {
+    const rows = document.querySelectorAll("#historyTable tr");
+    let data = [];
+    rows.forEach(r => { let cols = r.querySelectorAll("th,td"); let arr = []; cols.forEach(c => arr.push(c.innerText)); data.push(arr); });
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "History");
+    XLSX.writeFile(wb, "BatchHistory.xlsx");
 }
 
 </script>
-
 </body>
 </html>
