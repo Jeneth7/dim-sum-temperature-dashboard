@@ -1,258 +1,322 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Dim Sum Temperature Dashboard</title>
+<meta charset="UTF-8">
+<title>Dim Sum Temperature Dashboard</title>
 
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
-    <!-- MQTT Websocket -->
-    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
-    <!-- Excel Export -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<style>
 
-    <style>
-        body { font-family: Arial; margin: 20px; }
+body{
+font-family: Arial;
+margin:40px;
+}
 
-        /* Login Screen */
-        #loginBox {
-            text-align: center;
-            margin-top: 100px;
-        }
-        #loginBox input {
-            padding: 5px;
-            width: 200px;
-            margin-bottom: 10px;
-        }
-        #loginBox button {
-            padding: 5px 20px;
-        }
+h1{
+text-align:center;
+}
 
-        /* Dashboard */
-        #dashboard { display: none; }
-        .container { display: flex; justify-content: space-between; }
-        .window { width: 48%; border: 1px solid black; padding: 10px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid black; padding: 5px; text-align: center; }
-        canvas { margin-top: 10px; }
-        button { margin-top: 20px; padding: 10px; }
-        #batchControls { margin-top: 20px; }
-    </style>
+#controls{
+margin-bottom:20px;
+}
+
+button{
+padding:8px 14px;
+margin-left:5px;
+}
+
+table{
+border-collapse:collapse;
+width:100%;
+margin-top:20px;
+}
+
+th,td{
+border:1px solid #ccc;
+padding:6px;
+text-align:center;
+}
+
+</style>
 </head>
 
 <body>
 
-<!-- Login Screen -->
-<div id="loginBox">
-    <h2>Temperature Dashboard Login</h2>
-    <input type="text" id="username" placeholder="Username"><br>
-    <input type="password" id="password" placeholder="Password"><br>
-    <button onclick="login()">Login</button>
-    <p id="error" style="color:red;"></p>
-</div>
+<h1>Dim Sum Temperature Dashboard</h1>
 
-<!-- Dashboard (hidden until login) -->
-<div id="dashboard">
+<div id="controls">
 
-<h1>Automated Dim Sum Temperature Monitoring</h1>
+Batch ID:
+<input id="batchID" type="text">
 
-<div class="container">
+<button onclick="startBatch()">Start Batch</button>
+<button onclick="stopBatch()">Stop Batch</button>
 
-    <!-- Steam Window -->
-    <div class="window">
-        <h2>Steam Temperature</h2>
-        <table id="steamTable">
-            <tr>
-                <th>Time</th>
-                <th>Temperature (°C)</th>
-            </tr>
-        </table>
-        <canvas id="steamChart"></canvas>
-    </div>
-
-    <!-- Dim Sum Window -->
-    <div class="window">
-        <h2>Dim Sum Temperature</h2>
-        <table id="dimsumTable">
-            <tr>
-                <th>Time</th>
-                <th>Temperature (°C)</th>
-            </tr>
-        </table>
-        <canvas id="dimsumChart"></canvas>
-    </div>
+<button onclick="downloadExcel()">Download Excel</button>
 
 </div>
 
-<div id="batchControls">
-    <label>Batch ID: <input type="text" id="batchID" placeholder="e.g., DS240326-01"></label>
-    <button onclick="startBatch()">Start Batch</button>
-    <button onclick="stopBatch()">Stop Batch</button>
-    <button onclick="downloadExcelTemplate()">Download Excel</button>
-</div>
+<canvas id="tempChart"></canvas>
 
-</div>
+<table id="tempTable">
+<thead>
+<tr>
+<th>Time</th>
+<th>Steam Temp (°C)</th>
+<th>Dim Sum Temp (°C)</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
 
 <script>
-/* --------------------- LOGIN --------------------- */
-function login() {
-    let user = document.getElementById("username").value;
-    let pass = document.getElementById("password").value;
 
-    if(user === "smh" && pass === "dimsum123") {
-        document.getElementById("loginBox").style.display = "none";
-        document.getElementById("dashboard").style.display = "block";
-    } else {
-        document.getElementById("error").innerText = "Incorrect username or password";
-    }
+/* ==========================
+FIREBASE CONFIG
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyBJYBNVCNXHlaCl5wakhohU6aED5ZZXzhk",
+  authDomain: "dim-sum-temperature-monitoring.firebaseapp.com",
+  projectId: "dim-sum-temperature-monitoring",
+  storageBucket: "dim-sum-temperature-monitoring.firebasestorage.app",
+  messagingSenderId: "1014513307897",
+  appId: "1:1014513307897:web:dbf077e9f085b8823d1228",
+  measurementId: "G-1JV1ZW47KX"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+========================== */
+
+const firebaseConfig = {
+
+apiKey: "PASTE_HERE",
+authDomain: "PASTE_HERE",
+projectId: "PASTE_HERE",
+storageBucket: "PASTE_HERE",
+messagingSenderId: "PASTE_HERE",
+appId: "PASTE_HERE"
+
+};
+
+firebase.initializeApp(firebaseConfig);
+
+const db = firebase.firestore();
+
+
+/* ==========================
+GLOBAL VARIABLES
+========================== */
+
+let batchActive=false;
+let currentBatchID="";
+let startTime;
+
+let times=[];
+let steamTemps=[];
+let dimsumTemps=[];
+
+
+/* ==========================
+CHART SETUP
+========================== */
+
+const ctx=document.getElementById('tempChart').getContext('2d');
+
+const chart=new Chart(ctx,{
+type:'line',
+data:{
+labels:times,
+datasets:[
+{
+label:'Steam Temp',
+data:steamTemps,
+borderWidth:2
+},
+{
+label:'Dim Sum Temp',
+data:dimsumTemps,
+borderWidth:2
 }
-
-/* --------------------- VARIABLES --------------------- */
-let steamData = [];
-let dimsumData = [];
-let timeLabels = [];
-let currentBatchID = '';
-let batchActive = false;
-
-/* --------------------- TIME --------------------- */
-function getCurrentTime() {
-    let now = new Date();
-    return now.toLocaleTimeString('en-GB'); // Format: HH:MM:SS
+]
+},
+options:{
+scales:{
+x:{
+ticks:{
+maxRotation:90,
+minRotation:90
 }
-
-/* --------------------- CHARTS --------------------- */
-let steamChart = new Chart(document.getElementById('steamChart'), {
-    type: 'line',
-    data: {
-        labels: timeLabels,
-        datasets: [{
-            label: 'Steam Temperature (°C)',
-            data: steamData,
-            borderColor: 'red',
-            fill: false,
-            tension: 0.1
-        }]
-    },
-    options: {
-        scales: {
-            x: { title: { display: true, text: 'Time' }, ticks: { maxRotation: 90, minRotation: 90 } },
-            y: { title: { display: true, text: 'Temperature (°C)' } }
-        }
-    }
+},
+y:{
+title:{
+display:true,
+text:'Temperature °C'
+}
+}
+}
+}
 });
 
-let dimsumChart = new Chart(document.getElementById('dimsumChart'), {
-    type: 'line',
-    data: {
-        labels: timeLabels,
-        datasets: [{
-            label: 'Dim Sum Temperature (°C)',
-            data: dimsumData,
-            borderColor: 'blue',
-            fill: false,
-            tension: 0.1
-        }]
-    },
-    options: {
-        scales: {
-            x: { title: { display: true, text: 'Time' }, ticks: { maxRotation: 90, minRotation: 90 } },
-            y: { title: { display: true, text: 'Temperature (°C)' } }
-        }
-    }
+
+/* ==========================
+MQTT CONNECTION
+========================== */
+
+const client=mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
+
+client.on('connect',function(){
+
+console.log("MQTT connected");
+
+client.subscribe("dimsum/temperature");
+
 });
 
-/* --------------------- MQTT --------------------- */
-const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
 
-client.on('connect', () => {
-    console.log("Connected to MQTT Broker");
-    client.subscribe("dimsumfactory/steamcabinet/temperature");
+client.on('message',function(topic,message){
+
+if(!batchActive)return;
+
+const data=JSON.parse(message.toString());
+
+const steam=parseFloat(data.steam).toFixed(3);
+const dimsum=parseFloat(data.dimsum).toFixed(3);
+
+const elapsed=Math.floor((Date.now()-startTime)/1000);
+
+const h=String(Math.floor(elapsed/3600)).padStart(2,'0');
+const m=String(Math.floor((elapsed%3600)/60)).padStart(2,'0');
+const s=String(elapsed%60).padStart(2,'0');
+
+const time=`${h}:${m}:${s}`;
+
+times.push(time);
+steamTemps.push(steam);
+dimsumTemps.push(dimsum);
+
+chart.update();
+
+const row=document.createElement("tr");
+
+row.innerHTML=`<td>${time}</td><td>${steam}</td><td>${dimsum}</td>`;
+
+document.querySelector("#tempTable tbody").appendChild(row);
+
+
+/* SAVE TO FIREBASE */
+
+db.collection("batches")
+.doc(currentBatchID)
+.collection("readings")
+.add({
+
+time:time,
+steam:parseFloat(steam),
+dimsum:parseFloat(dimsum),
+timestamp:new Date()
+
 });
 
-client.on('message', (topic, message) => {
-    if (!batchActive) return; // ignore if batch not running
-    try {
-        let data = JSON.parse(message.toString());
-        let time = getCurrentTime();
-        let steamTemp = parseFloat(data.steam_temp).toFixed(3);
-        let dimsumTemp = parseFloat(data.dimsum_temp).toFixed(3);
-
-        timeLabels.push(time);
-        steamData.push(steamTemp);
-        dimsumData.push(dimsumTemp);
-
-        // Update tables
-        let steamRow = document.getElementById("steamTable").insertRow();
-        steamRow.insertCell(0).innerHTML = time;
-        steamRow.insertCell(1).innerHTML = steamTemp;
-
-        let dimsumRow = document.getElementById("dimsumTable").insertRow();
-        dimsumRow.insertCell(0).innerHTML = time;
-        dimsumRow.insertCell(1).innerHTML = dimsumTemp;
-
-        // Update charts
-        steamChart.update();
-        dimsumChart.update();
-    } catch(e) { console.error("Invalid message:", e); }
 });
 
-/* --------------------- BATCH CONTROLS --------------------- */
-function startBatch() {
-    currentBatchID = document.getElementById('batchID').value.trim();
-    if (!currentBatchID) { alert("Please enter a Batch ID."); return; }
-    batchActive = true;
-    timeLabels = []; steamData = []; dimsumData = [];
 
-    // Clear tables
-    document.getElementById("steamTable").innerHTML = '<tr><th>Time</th><th>Temperature (°C)</th></tr>';
-    document.getElementById("dimsumTable").innerHTML = '<tr><th>Time</th><th>Temperature (°C)</th></tr>';
+/* ==========================
+START BATCH
+========================== */
 
-    steamChart.data.labels = timeLabels; steamChart.data.datasets[0].data = steamData; steamChart.update();
-    dimsumChart.data.labels = timeLabels; dimsumChart.data.datasets[0].data = dimsumData; dimsumChart.update();
+async function startBatch(){
 
-    alert(`Batch ${currentBatchID} started!`);
+const batchID=document.getElementById("batchID").value.trim();
+
+if(!batchID){
+alert("Enter Batch ID");
+return;
 }
 
-function stopBatch() {
-    if (!batchActive) return;
-    batchActive = false;
-    alert(`Batch ${currentBatchID} stopped! You can now download the Excel file.`);
+const doc=await db.collection("batches").doc(batchID).get();
+
+if(doc.exists){
+
+alert("Batch ID already exists!");
+
+return;
+
 }
 
-/* --------------------- EXCEL TEMPLATE EXPORT --------------------- */
-function downloadExcelTemplate() {
-    if (!currentBatchID) { alert("Please start a batch first."); return; }
+currentBatchID=batchID;
 
-    fetch('DimSumTemplate.xlsx')
-        .then(res => res.arrayBuffer())
-        .then(data => {
-            let workbook = XLSX.read(data, {type: "array"});
-            let sheetName = workbook.SheetNames[0];
-            let worksheet = workbook.Sheets[sheetName];
+batchActive=true;
 
-            // Clear existing rows except headers
-            XLSX.utils.sheet_add_json(worksheet, [], {origin:1, skipHeader:true});
+startTime=Date.now();
 
-            // Add new data
-            let newData = [];
-            for (let i = 0; i < timeLabels.length; i++) {
-                newData.push({
-                    Time: timeLabels[i],
-                    Steam_Temperature: steamData[i],
-                    DimSum_Temperature: dimsumData[i]
-                });
-            }
+times=[];
+steamTemps=[];
+dimsumTemps=[];
 
-            XLSX.utils.sheet_add_json(worksheet, newData, {origin:1, skipHeader:true});
+chart.data.labels=times;
+chart.data.datasets[0].data=steamTemps;
+chart.data.datasets[1].data=dimsumTemps;
 
-            // Rename sheet to Batch ID
-            XLSX.utils.book_append_sheet(workbook, worksheet, currentBatchID);
+chart.update();
 
-            XLSX.writeFile(workbook, `DimSum_${currentBatchID}_Temperature.xlsx`);
-        })
-        .catch(err => console.error("Error loading template:", err));
+document.querySelector("#tempTable tbody").innerHTML="";
+
 }
+
+
+/* ==========================
+STOP BATCH
+========================== */
+
+function stopBatch(){
+
+batchActive=false;
+
+alert("Batch saved to website");
+
+}
+
+
+/* ==========================
+EXCEL DOWNLOAD
+========================== */
+
+function downloadExcel(){
+
+let data=[["Time","Steam Temp","Dim Sum Temp"]];
+
+for(let i=0;i<times.length;i++){
+
+data.push([times[i],steamTemps[i],dimsumTemps[i]]);
+
+}
+
+const ws=XLSX.utils.aoa_to_sheet(data);
+
+const wb=XLSX.utils.book_new();
+
+XLSX.utils.book_append_sheet(wb,ws,currentBatchID);
+
+XLSX.writeFile(wb,currentBatchID+".xlsx");
+
+}
+
 </script>
 
 </body>
